@@ -3,7 +3,9 @@
 var util = require('./util'),
     path = require('path'),
     _set = require('lodash/object/set'),
-    loaderFactory = require('subschema-loader').loaderFactory,
+    sf = require('subschema-factory'),
+    loaderFactory = sf.loaderFactory,
+    warning = sf.warning,
     mapTo = util.mapTo,
     toArray = util.toArray,
     toFields = util.toFields;
@@ -28,7 +30,9 @@ function helpLine(conf, short, long, describe) {
 function printHelp(conf, cmd, error) {
     conf.message(`Subschema Setup:\n running ${conf.file}`);
     var schema = conf.schema;
-    if (cmd) {
+    if (cmd && schema && schema[cmd]) {
+        var cmdObj = schema[cmd];
+
         conf.message(`Help for ${cmd}\n${cmdObj.help || ''}`);
 
         if (schema) {
@@ -129,11 +133,12 @@ function processArgs(conf, args) {
                 helpError = 'a file is required';
 
             } else {
+
                 conf.loader.addSchema(parts[2] && parts[2].replace(/-/, '') || 'default', conf.readJS(parts[3]))
             }
             continue;
         }
-        var defaultsArgs = (/--(no-)?defaults/.exec(args[i])
+        var defaultsArgs = /--(no-)?defaults/.exec(args[i]);
         if (defaultsArgs) {
             conf.defaults = defaultsArgs[1] ? false : true;
             continue;
@@ -154,13 +159,13 @@ function processArgs(conf, args) {
         printHelp(conf, helpCmd, helpError);
         return 1;
     }
-    var schema = conf.loader.loadSchema('default');
+    var schema = conf.schema || conf.loader.loadSchema('default');
     if (schema == null) {
         printHelp(conf, '--cli-config', 'A default schema must be defined');
         return 1;
     }
     var fields = toFields(schema), schema = schema.schema || schema;
-    var keyValues = conf.defaults ? conf.loadDefaults() : {};
+    var keyValues = conf.defaults == true ? conf.loadDefaults() : conf.values || {};
     for (var i = 0, l = unhandledArgs.length; i < l; i++) {
         var parts = unhandledArgs[i].split('=', 2);
         if (/^--/.test(parts[0])) {
@@ -170,12 +175,75 @@ function processArgs(conf, args) {
             var p = findShortPath(unhandledArgs[i].substring(1), fields, schema);
             if (!p) {
                 printHelp(conf, unhandledArgs[i].substring(1), 'Unknown Command');
+                return 1;
             }
+            _set(keyValues, p, parts.length === 2 ? parts[1] : true);
         }
     }
 
     return 0;
 
+}
+/**
+ * Shorts can be nested
+ *  -oP is equivalient to
+ *  {
+ *    open:{
+ *      short:'o',
+ *      subSchema:{
+ *        schema:{
+ *          port:{
+ *            type:'p'
+ *          }
+ *        }
+ *      }
+ *    }
+ *  }
+ * @param short
+ * @param fields
+ * @param schema
+ * @returns {*}
+ */
+function findShortPath(short, fields, schema, path) {
+    schema = schema;
+    path = path || '';
+    fields = fields || schema.fields;
+    var shorts = short.split('', 2);
+    var field;
+    var p = shorts.shift();
+    for (var i = 0, l = fields.length; i < l; i++) {
+        var fp = replace(fields[i], path).split(/\./, 2);
+        var fk = fp.shift();
+        var field = schema[fk];
+        if (field && field.short == p) {
+            if (shorts.length) {
+                if (field.subSchema) {
+                    var nschema = field.subSchema.schema || field.subSchema;
+                    return findShortPath(shorts.shift(), fp.length === 0 ? Object.keys(nschema) : [fp.shift()], nschema, spath(path, fk));
+                } else if (field.type === 'Mixed' || 'List') {
+                    warning(false, 'Attempting to set a nested value on a Mixed or List using short notating is broken')
+                }
+            }
+            return spath(path, fk);
+        }
+    }
+    return null;
+}
+function spath(sub, post) {
+    if (!sub) {
+        return post;
+    }
+    if (!post) {
+        return sub;
+    }
+    return sub + '.' + post;
+}
+function replace(orig, norig) {
+    if (!norig) return orig;
+    if (orig.substring(0, norig.length) === norig) {
+        return orig.substring(norig.length);
+    }
+    return orig;
 }
 
 function toPrimitive(val) {

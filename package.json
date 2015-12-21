@@ -5,10 +5,11 @@
   "main": "index.js",
   "dependencies": {
     "lodash": "^3.10.1",
-    "subschema-loader": "^1.0.0"
+    "subschema-factory": "^1.0.0"
   },
   "devDependencies": {
     "expect": "^1.13.4",
+    "lodash": "^3.10.1",
     "mocha": "^2.3.4"
   },
   "scripts": {
