@@ -264,7 +264,7 @@ function toPrimitive(val) {
 
 if (require.main === module) {
     processArgs({
-        file: argv[1],
+        file: process.argv[1],
         message: console.log,
         loadJS: function (file) {
             return require(path.join(process.cwd(), file));
@@ -274,7 +274,6 @@ if (require.main === module) {
             return {};
         }
     }, process.argv.slice(2));
-    console.log(JSON.stringify(conf.config, null, 2));
 } else {
     module.exports = {
         processArgs,

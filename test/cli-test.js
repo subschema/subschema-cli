@@ -38,6 +38,7 @@ describe('cli', function () {
         }, ['--help'])).toBe(1);
         console.log(messages);
     });
+
     it('should handle -o', function () {
         var messages = [];
         expect(cli.processArgs({
@@ -50,6 +51,7 @@ describe('cli', function () {
         }, ['-o'])).toBe(0);
         console.log(messages);
     });
+
     it('should handle -go', function () {
         var messages = [];
         var values = {};
